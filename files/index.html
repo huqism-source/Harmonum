@@ -34,9 +34,9 @@ button[hidden]{display:none}
 input[type=range]{width:96px;accent-color:var(--brass);height:20px;margin:0}
 #kbwrap{flex:1;min-height:0;position:relative;overflow:hidden;margin:6px 6px 0;border:3px solid #120802;border-radius:6px 6px 0 0;background:#120802}
 #kb{position:absolute;top:0;left:0;height:100%;touch-action:none}
-.key{position:absolute;top:0;touch-action:none;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;padding-bottom:8px;font-size:12px;font-weight:700}
+.key{position:absolute;top:0;touch-action:none;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;padding-bottom:8px;font-size:var(--fs,12px);font-weight:700;overflow:hidden}
 .key.w{height:100%;background:linear-gradient(#fffdf6,#efe6cf 85%,#d9cba8);color:#4a2a12;border:1px solid #a28f67;border-radius:0 0 7px 7px}
-.key.b{height:60%;z-index:2;background:linear-gradient(#3b3b3b,#0b0b0b);color:#d8c6a0;border:1px solid #000;border-radius:0 0 6px 6px;font-size:9px;box-shadow:0 3px 4px #000a}
+.key.b{height:60%;z-index:2;background:linear-gradient(#3b3b3b,#0b0b0b);color:#d8c6a0;border:1px solid #000;border-radius:0 0 6px 6px;font-size:calc(var(--fs,12px)*.75);box-shadow:0 3px 4px #000a}
 .key.w.down{background:linear-gradient(#f3d27a,#e0a93c)}.key.b.down{background:linear-gradient(#a8741f,#6a4510)}
 .key.dim{opacity:.35}.key.held{outline:2px solid var(--red);outline-offset:-3px}.key.sa{border-bottom:5px solid var(--red)}
 #pan{padding:3px 12px;background:#120802;display:none}#pan input{width:100%}
@@ -65,6 +65,7 @@ input[type=range]{width:96px;accent-color:var(--brass);height:20px;margin:0}
   <div class="grp"><b>Tone</b><input type="range" id="tone" min="0" max="1" step="0.01"></div>
   <div class="grp"><b>Vibrato</b><input type="range" id="vib" min="0" max="1" step="0.01"></div>
   <div class="grp"><b>Notation</b><button id="bLab"></button></div>
+  <div class="grp"><b>Zoom</b><div class="row"><button id="zOut">−</button><button id="zFit">Fit</button><button id="zIn">+</button><button id="zPinch" title="Pinch zoom on/off">🤏</button></div></div>
   <div class="grp"><b>Keys</b><div class="row"><button data-k="2">2 oct</button><button data-k="3">3 oct</button></div></div>
  </section>
  <div id="kbwrap"><div id="kb"></div></div>
@@ -80,7 +81,7 @@ const SARGAM=['Sa','Re♭','Re','Ga♭','Ga','Ma','Ma♯','Pa','Dha♭','Dha','N
 const BLACK=[1,3,6,8,10];
 const RAGAS={'All notes':null,Bilawal:[0,2,4,5,7,9,11],Yaman:[0,2,4,6,7,9,11],Khamaj:[0,2,4,5,7,9,10],Kafi:[0,2,3,5,7,9,10],Asavari:[0,2,3,5,7,8,10],Bhairavi:[0,1,3,5,7,8,10],Bhairav:[0,1,4,5,7,8,11],Bhupali:[0,2,4,7,9],Malkauns:[0,3,5,8,10],Marwa:[0,1,4,6,9,11],Todi:[0,1,3,6,7,8,11],'Puriya Dhanashree':[0,1,4,6,7,8,11]};
 const SONGS={'Happy Birthday':[[0,.75],[0,.25],[2,1],[0,1],[5,1],[4,2],[0,.75],[0,.25],[2,1],[0,1],[7,1],[5,2]],'Jana Gana Mana (opening)':[[0,1],[2,1],[4,1],[4,1],[4,1],[4,1],[4,1],[2,1],[4,1],[5,2]]};
-const D={vol:.8,tone:.55,rev:.25,vib:0,fine:0,root:0,tp:0,oct:0,labels:'sargam',keys:3,raga:'All notes',dtype:'harm',drone:false,stops:{b:false,m:true,f:false}};
+const D={vol:.8,tone:.55,rev:.25,vib:0,fine:0,root:0,tp:0,oct:0,labels:'sargam',keys:3,zoom:1,pinch:true,raga:'All notes',dtype:'harm',drone:false,stops:{b:false,m:true,f:false}};
 let S={...D,stops:{...D.stops}};
 try{const x=JSON.parse(localStorage.getItem('harm_v2')||'null');if(x)S={...S,...x,stops:{...S.stops,...(x.stops||{})},drone:false}}catch(e){}
 try{if(location.hash.length>3){const x=JSON.parse(atob(location.hash.slice(1)));S={...S,...x,stops:{...S.stops,...(x.stops||{})},drone:false}}}catch(e){}
@@ -162,10 +163,15 @@ function build(){
   e.className='key '+(b?'b':'w')+(m%12===0?' sa':'');e.dataset.m=m;e.dataset.wi=b?whites:whites++;kb.appendChild(e)}
  layout();
 }
+let off=0,curW=60;
 function layout(){
- const w=$('#kbwrap').clientWidth,W=Math.max(34,w/whites),bw=W*.62;kb.style.width=whites*W+'px';
+ const w=$('#kbwrap').clientWidth,W=curW=(w/whites)*S.zoom,bw=W*.62;kb.style.width=whites*W+'px';kb.style.setProperty('--fs',Math.max(8,Math.min(18,W*.3))+'px');
  $$('.key').forEach(e=>{const i=+e.dataset.wi;if(e.classList.contains('w')){e.style.left=i*W+'px';e.style.width=W+'px'}else{e.style.left=(i*W-bw/2)+'px';e.style.width=bw+'px'}});
- $('#pan').style.display=whites*W>w+2?'block':'none';relabel();pan();hpos();
+ relabel();pan();hpos();
+}
+function setZoom(z,fx){
+ const r=$('#kbwrap').getBoundingClientRect(),w=r.width,px=(fx==null?r.left+w/2:fx)-r.left,kw0=kb.offsetWidth,tx0=kw0<w?(w-kw0)/2:-off,u=(px-tx0)/curW;
+ S.zoom=Math.max(.5,Math.min(3.5,z));layout();off=u*curW-px;pan();
 }
 function relabel(){
  const sc=RAGAS[S.raga];
@@ -173,15 +179,25 @@ function relabel(){
   if(S.labels==='sargam')t=SARGAM[m%12];else if(S.labels==='west')t=NAMES[(m+shift()+120)%12];
   e.textContent=t;e.classList.toggle('dim',!!sc&&!sc.includes(m%12))});
 }
-function pan(){const w=$('#kbwrap').clientWidth,mx=Math.max(0,kb.offsetWidth-w);kb.style.transform=`translateX(${-mx*($('#scroll').value/1000)}px)`}
-$('#scroll').oninput=pan;addEventListener('resize',layout);
+function pan(){const w=$('#kbwrap').clientWidth,kw=kb.offsetWidth,mx=Math.max(0,kw-w);off=Math.max(0,Math.min(mx,off));kb.style.transform=`translateX(${kw<w?(w-kw)/2:-off}px)`;$('#pan').style.display=mx>2?'block':'none';$('#scroll').value=mx?off/mx*1000:0}
+$('#scroll').oninput=e=>{const mx=Math.max(0,kb.offsetWidth-$('#kbwrap').clientWidth);off=e.target.value/1000*mx;pan()};
+addEventListener('resize',layout);
 
-const ptr=new Map(),keyAt=(x,y)=>{const el=document.elementFromPoint(x,y);return el&&el.closest?el.closest('.key'):null};
+const ptr=new Map(),pos=new Map(),keyAt=(x,y)=>{const el=document.elementFromPoint(x,y);return el&&el.closest?el.closest('.key'):null};
+let zooming=false,d0=0,z0=1;
+const pv2=()=>[...pos.values()],pdist=()=>{const [a,b]=pv2();return Math.hypot(a.x-b.x,a.y-b.y)},pmid=()=>{const [a,b]=pv2();return (a.x+b.x)/2};
 kb.addEventListener('pointerdown',e=>{const k=e.target.closest('.key');if(!k)return;e.preventDefault();kb.setPointerCapture(e.pointerId);
+ pos.set(e.pointerId,{x:e.clientX,y:e.clientY});if(zooming)return;if(pos.size===2){d0=pdist();z0=S.zoom}
  const m=+k.dataset.m;ptr.set(e.pointerId,m);if(held.has(m)){held.delete(m);mark(m,'held',false);stopV('n'+m,true)}noteOn(m)});
-kb.addEventListener('pointermove',e=>{if(!ptr.has(e.pointerId))return;const k=keyAt(e.clientX,e.clientY);if(!k)return;const m=+k.dataset.m,o=ptr.get(e.pointerId);if(m!==o){noteOff(o);ptr.set(e.pointerId,m);noteOn(m)}});
-const up=e=>{if(ptr.has(e.pointerId)){noteOff(ptr.get(e.pointerId));ptr.delete(e.pointerId)}};
+kb.addEventListener('pointermove',e=>{
+ if(pos.has(e.pointerId))pos.set(e.pointerId,{x:e.clientX,y:e.clientY});
+ if(S.pinch&&pos.size===2){const d=pdist();
+  if(!zooming&&Math.abs(d-d0)>18){zooming=true;ptr.forEach(m=>{mark(m,'down',false);stopV('n'+m,true)});ptr.clear();d0=d;z0=S.zoom}
+  if(zooming){setZoom(z0*d/d0,pmid());return}}
+ if(zooming||!ptr.has(e.pointerId))return;const k=keyAt(e.clientX,e.clientY);if(!k)return;const m=+k.dataset.m,o=ptr.get(e.pointerId);if(m!==o){noteOff(o);ptr.set(e.pointerId,m);noteOn(m)}});
+const up=e=>{pos.delete(e.pointerId);if(ptr.has(e.pointerId)){noteOff(ptr.get(e.pointerId));ptr.delete(e.pointerId)}if(!pos.size){if(zooming)save();zooming=false}};
 kb.addEventListener('pointerup',up);kb.addEventListener('pointercancel',up);
+$('#kbwrap').addEventListener('wheel',e=>{if(e.ctrlKey){e.preventDefault();setZoom(S.zoom*(e.deltaY<0?1.1:.9),e.clientX);save()}},{passive:false});
 addEventListener('contextmenu',e=>e.preventDefault());
 
 /* pump handle */
@@ -234,7 +250,7 @@ function sync(){
  $('#root').value=S.root;$('#dtype').value=S.dtype;$('#raga').value=S.raga;$('#rev').value=S.rev;$('#tone').value=S.tone;$('#vib').value=S.vib;
  $('#oV').textContent=(S.oct>0?'+':'')+S.oct;$('#tV').textContent=(S.tp>0?'+':'')+S.tp;$('#bLab').textContent=LABN[S.labels];
  $('#bDrone').textContent=S.drone?'ON':'OFF';$('#bDrone').classList.toggle('on',S.drone);
- $$('#reeds button').forEach(b=>b.classList.toggle('on',S.stops[b.dataset.s]));$$('[data-k]').forEach(b=>b.classList.toggle('on',+b.dataset.k===S.keys));hpos();
+ $$('#reeds button').forEach(b=>b.classList.toggle('on',S.stops[b.dataset.s]));$$('[data-k]').forEach(b=>b.classList.toggle('on',+b.dataset.k===S.keys));$('#zPinch').classList.toggle('on',S.pinch);hpos();
 }
 $('#root').onchange=e=>{S.root=+e.target.value;relabel();retune();save()};
 $('#dtype').onchange=e=>{S.dtype=e.target.value;retune();sync();save()};
@@ -247,6 +263,8 @@ $$('#reeds button').forEach(b=>b.onclick=()=>{S.stops[b.dataset.s]=!S.stops[b.da
 [['rev','rev'],['tone','tone'],['vib','vib']].forEach(([i,k])=>$('#'+i).oninput=e=>{S[k]=+e.target.value;init();applyFx();save()});
 $('#bLab').onclick=()=>{S.labels={sargam:'west',west:'none',none:'sargam'}[S.labels];sync();relabel();save()};
 $$('[data-k]').forEach(b=>b.onclick=()=>{S.keys=+b.dataset.k;sync();build();save()});
+$('#zIn').onclick=()=>{setZoom(S.zoom*1.25);save()};$('#zOut').onclick=()=>{setZoom(S.zoom/1.25);save()};$('#zFit').onclick=()=>{off=0;setZoom(1);save()};
+$('#zPinch').onclick=()=>{S.pinch=!S.pinch;sync();save()};
 $('#bRec').onclick=rec;$('#bShare').onclick=share;$('#bFs').onclick=fs;
 $('#bHold').onpointerdown=()=>setHold(!hold);
 $('#bHelp').onclick=()=>$('#help').classList.add('open');$('#bHelpX').onclick=()=>$('#help').classList.remove('open');
